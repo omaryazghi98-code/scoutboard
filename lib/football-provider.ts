@@ -1,4 +1,4 @@
-import { getPlayerFootballdata, nextFixturesFootballdata, searchPlayersFootballdata } from './footballdata-provider';
+import { getPlayerFootballdata, nextFixturesFootballdata, resolveTeamFootballdata, searchPlayersFootballdata } from './footballdata-provider';
 import { nextFixturesOpenFoot, searchPlayersOpenFoot } from './openfoot-provider';
 
 const BASE_URL = process.env.FOOTBALL_API_BASE_URL || 'https://v3.football.api-sports.io';
@@ -31,6 +31,11 @@ export async function getPlayerProfile(playerId: number | string, provider: Prov
     const rows = await apiFootballRequest<PlayerResponse>(`/players?id=${encodeURIComponent(String(playerId))}`, apiKey);
     return rows[0] || null;
   }
+  return null;
+}
+
+export async function resolveTeam(name: string, provider: ProviderName, apiKey?: string) {
+  if (provider === 'footballdata') return resolveTeamFootballdata(name, apiKey || '');
   return null;
 }
 
