@@ -26,7 +26,7 @@ type Fixture = {
 
 const STORAGE_KEY = 'scoutboard-watchlist';
 const LEAGUE_STORAGE_KEY = 'scoutboard-search-league';
-const SEASON = 2026;
+const SEASON = 2024;
 const competitions = [
   { id: 39, name: 'Premier League' },
   { id: 140, name: 'LaLiga' },
@@ -241,7 +241,7 @@ export default function Home() {
         <div className="modalBackdrop" onMouseDown={() => setShowSearch(false)}>
           <section className="searchModal" onMouseDown={(event) => event.stopPropagation()}>
             <div className="modalHeader"><div><div className="eyebrow">LIVE PLAYER DISCOVERY</div><h2>Add a player</h2></div><button className="iconButton" onClick={() => setShowSearch(false)}>×</button></div>
-            <div className="searchScope"><label className="fieldLabel">Competition<select value={leagueId} onChange={(event) => changeLeague(Number(event.target.value))}>{competitions.map((league) => <option value={league.id} key={league.id}>{league.name}</option>)}</select></label><span className="scopeSeason mono">SEASON {SEASON}/{SEASON + 1}</span></div>
+            <div className="searchScope"><label className="fieldLabel">Competition<select value={leagueId} onChange={(event) => changeLeague(Number(event.target.value))}>{competitions.map((league) => <option value={league.id} key={league.id}>{league.name}</option>)}</select></label><span className="scopeSeason mono">FREE PLAN · SEASON {SEASON}/{SEASON + 1}</span></div>
             <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search player in this competition..." />
             <div className="searchResults">
               {!query.trim() && <div className="noResults">Choose a competition, then type at least 3 characters.</div>}
