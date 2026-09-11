@@ -22,6 +22,30 @@ export async function getPlayerFootballdata(playerId: number | string, apiKey: s
   return request(`/players/${encodeURIComponent(String(playerId))}`, apiKey);
 }
 
+export async function resolveTeamFootballdata(name: string, apiKey: string) {
+  const data = await request(`/teams?q=${encodeURIComponent(name.trim())}&limit=10`, apiKey);
+  const teams = Array.isArray(data) ? data : Array.isArray(data?.teams) ? data.teams : Array.isArray(data?.results) ? data.results : [];
+  const normalized = name.trim().toLocaleLowerCase();
+  const ranked = teams
+    .map((team: any) => ({
+      id: team?.team_id ?? team?.id,
+      name: team?.team_name ?? team?.name ?? team?.team_name_english ?? team?.short_name ?? '',
+      logo: team?.team_logo ?? team?.logo ?? null,
+    }))
+    .filter((team: any) => team.id != null && team.name)
+    .sort((a: any, b: any) => {
+      const aName = a.name.toLocaleLowerCase();
+      const bName = b.name.toLocaleLowerCase();
+      if (aName === normalized) return -1;
+      if (bName === normalized) return 1;
+      if (aName.includes(normalized)) return -1;
+      if (bName.includes(normalized)) return 1;
+      return 0;
+    });
+  const team = ranked[0];
+  return team ? { id: String(team.id), name: team.name, logo: team.logo } : null;
+}
+
 export async function nextFixturesFootballdata(teamId: number | string, apiKey: string) {
   const data = await request(`/fixtures/upcoming?team_id=${encodeURIComponent(String(teamId))}&limit=10`, apiKey);
   return Array.isArray(data) ? data : Array.isArray(data?.fixtures) ? data.fixtures : Array.isArray(data?.matches) ? data.matches : [];
