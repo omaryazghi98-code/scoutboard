@@ -1,5 +1,5 @@
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
-const DEFAULT_MODEL = 'gemini-3.8-flash';
+const DEFAULT_MODEL = 'gemini-3.7-flash';
 
 export type GeminiPlayer = {
   id: string;
@@ -15,19 +15,25 @@ export type GeminiPlayer = {
   sourceUrl?: string | null;
 };
 
-export async function searchPlayersGemini(query: string, apiKey: string, model = DEFAULT_MODEL): Promise<GeminiPlayer[]> {
+export async function searchPlayersGemini(
+  query: string,
+  apiKey: string,
+  model = DEFAULT_MODEL,
+  useWebGrounding = false,
+): Promise<GeminiPlayer[]> {
   if (!apiKey) throw new Error('Gemini API key is not configured. Open Settings and add one.');
 
-  const prompt = `Find the football player or players that best match this query using current web information. Query: ${query}. Return ONLY a JSON array with at most 8 objects. Fields: id, providerId, name, team (current first-team club in 2026), teamId (null unless verified), teamLogo, position, nationality, photo, sourceUrl. Do not invent facts or return unrelated people.`;
+  const prompt = `Find the football player or players that best match this query. Query: ${query}. Return ONLY a JSON array with at most 8 objects. Fields: id, providerId, name, team (current first-team club if known), teamId (null unless verified), teamLogo, position, nationality, photo, sourceUrl. Do not invent facts or return unrelated people.`;
+  const body: Record<string, unknown> = {
+    contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    generationConfig: { responseMimeType: 'application/json' },
+  };
+  if (useWebGrounding) body.tools = [{ google_search: {} }];
 
   const response = await fetch(`${GEMINI_BASE}/models/${encodeURIComponent(model)}:generateContent`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
-    body: JSON.stringify({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      tools: [{ google_search: {} }],
-      generationConfig: { responseMimeType: 'application/json' },
-    }),
+    body: JSON.stringify(body),
     cache: 'no-store',
   });
 
