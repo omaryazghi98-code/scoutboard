@@ -16,6 +16,7 @@ const competitions = [
 ];
 function getProvider(): Provider { try { const value = window.localStorage.getItem(PROVIDER_KEY) as Provider | null; return value && ['api-football','footballdata','openfoot'].includes(value) ? value : 'footballdata'; } catch { return 'footballdata'; } }
 function getApiKey(provider: Provider) { try { return window.localStorage.getItem(KEY_NAMES[provider]) || ''; } catch { return ''; } }
+function saveWatchlist(players: Player[]) { try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(players)); } catch {} }
 
 export default function Home() {
   const [watchlist, setWatchlist] = useState<Player[]>([]), [provider, setProviderState] = useState<Provider>('footballdata');
@@ -33,34 +34,39 @@ export default function Home() {
       const savedLeague = Number(window.localStorage.getItem(LEAGUE_STORAGE_KEY));
       if (competitions.some((league) => league.id === savedLeague)) setLeagueId(savedLeague);
 
-      // Repair older watchlist entries that were saved before we resolved the player's club.
-      const unresolved = parsed.filter((player) => player.provider === 'footballdata' && player.providerId && !player.teamId);
+      // Repair legacy Footballdata entries by searching by name, not by the old/possibly invalid player id.
+      const unresolved = parsed.filter((player) => player.provider === 'footballdata' && !player.teamId && player.name);
       if (unresolved.length) {
         Promise.all(unresolved.map(async (player) => {
           try {
             const key = getApiKey('footballdata');
             if (!key) return null;
-            const response = await fetch(`/api/players/profile?id=${encodeURIComponent(String(player.providerId))}&provider=footballdata`, { headers: { 'x-scoutboard-api-key': key } });
+            const response = await fetch(`/api/players/search?q=${encodeURIComponent(player.name)}&provider=footballdata`, { headers: { 'x-scoutboard-api-key': key } });
             const data = await response.json();
-            return response.ok && data.player ? { ...player, ...data.player } : null;
+            const match = (data.players || []).find((candidate: Player) => candidate.teamId);
+            return match ? { ...player, ...match, provider: 'footballdata' as Provider } : null;
           } catch { return null; }
         })).then((resolved) => {
-          const byId = new Map(resolved.filter(Boolean).map((player) => [String(player!.id), player!]));
-          if (!byId.size) return;
-          setWatchlist((current) => current.map((player) => byId.get(String(player.id)) || player));
+          const byLegacyId = new Map(resolved.filter(Boolean).map((player) => [String(player!.id), player!]));
+          if (!byLegacyId.size) return;
+          setWatchlist((current) => {
+            const next = current.map((player) => byLegacyId.get(String(player.id)) || player);
+            saveWatchlist(next);
+            return next;
+          });
         });
       }
     } catch {}
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(watchlist));
+    saveWatchlist(watchlist);
     const groups = new Map<Provider, Set<string>>();
     watchlist.forEach((player) => { if (!player.teamId) return; const p = player.provider || provider; if (!groups.has(p)) groups.set(p, new Set()); groups.get(p)!.add(String(player.teamId)); });
     if (!groups.size) { setFixtures([]); setFixtureLoading(false); setFixtureError(''); return; }
     let cancelled = false; setFixtureLoading(true); setFixtureError('');
     Promise.all([...groups.entries()].flatMap(([p, ids]) => [...ids].map((teamId) => fetch(`/api/fixtures/team?teamId=${encodeURIComponent(teamId)}&provider=${p}`, { headers: getApiKey(p) ? { 'x-scoutboard-api-key': getApiKey(p) } : undefined }).then(async (res) => { const data = await res.json().catch(() => ({})); if (!res.ok) throw new Error(data.error || `Fixture request failed (${res.status})`); return data; }))))
-      .then((payloads) => { if (cancelled) return; const merged = payloads.flatMap((payload) => payload.fixtures as Fixture[]).filter(Boolean).sort((a, b) => a.kickoff.localeCompare(b.kickoff)); const unique = merged.filter((fixture, index, all) => all.findIndex((item) => item.id === fixture.id) === index); setFixtures(unique.slice(0, 12)); })
+      .then((payloads) => { if (cancelled) return; const merged = payloads.flatMap((payload) => payload.fixtures as Fixture[]).filter(Boolean).sort((a, b) => a.kickoff.localeCompare(b.kickoff)); const unique = merged.filter((fixture, index, all) => all.findIndex((item) => `${item.id}` === `${fixture.id}`) === index); setFixtures(unique.slice(0, 12)); })
       .catch((error) => { if (!cancelled) { setFixtures([]); setFixtureError(error instanceof Error ? error.message : 'Unable to load fixtures.'); } }).finally(() => { if (!cancelled) setFixtureLoading(false); });
     return () => { cancelled = true; };
   }, [watchlist, provider]);
@@ -86,7 +92,7 @@ export default function Home() {
       } catch {}
     }
     setWatchlist((current) => [...current, enriched]);
-    setNotice(`${enriched.name} added${enriched.teamId ? ` — ${enriched.team}` : ''}.`);
+    setNotice(`${enriched.name} added${enriched.teamId ? ` — ${enriched.team}` : ' — club unresolved'}.`);
     setQuery(''); setResults([]); setShowSearch(false);
   };
 
