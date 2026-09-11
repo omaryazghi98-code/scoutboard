@@ -14,8 +14,8 @@ async function request(path: string, apiKey: string) {
 }
 
 export async function searchPlayersFootballdata(query: string, apiKey: string) {
-  const data = await request(`/search?q=${encodeURIComponent(query.trim())}&type=players&limit=12`, apiKey);
-  return Array.isArray(data?.players) ? data.players : Array.isArray(data?.results?.players) ? data.results.players : [];
+  const data = await request(`/players?q=${encodeURIComponent(query.trim())}&limit=12`, apiKey);
+  return Array.isArray(data) ? data : Array.isArray(data?.players) ? data.players : Array.isArray(data?.results) ? data.results : [];
 }
 
 export async function getPlayerFootballdata(playerId: number | string, apiKey: string) {
