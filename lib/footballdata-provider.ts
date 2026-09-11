@@ -18,7 +18,11 @@ export async function searchPlayersFootballdata(query: string, apiKey: string) {
   return Array.isArray(data?.players) ? data.players : Array.isArray(data?.results?.players) ? data.results.players : [];
 }
 
-export async function nextFixturesFootballdata(teamId: number, apiKey: string) {
-  const data = await request(`/fixtures/upcoming?team_id=${teamId}&limit=10`, apiKey);
+export async function getPlayerFootballdata(playerId: number | string, apiKey: string) {
+  return request(`/players/${encodeURIComponent(String(playerId))}`, apiKey);
+}
+
+export async function nextFixturesFootballdata(teamId: number | string, apiKey: string) {
+  const data = await request(`/fixtures/upcoming?team_id=${encodeURIComponent(String(teamId))}&limit=10`, apiKey);
   return Array.isArray(data) ? data : Array.isArray(data?.fixtures) ? data.fixtures : Array.isArray(data?.matches) ? data.matches : [];
 }
