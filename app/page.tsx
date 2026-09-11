@@ -32,8 +32,33 @@ export default function Home() {
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem(STORAGE_KEY);
-      setWatchlist(saved ? JSON.parse(saved) : []);
-      setProviderState(getFixtureProvider());
+      const parsed: Player[] = saved ? JSON.parse(saved) : [];
+      const activeProvider = getFixtureProvider();
+      setWatchlist(parsed);
+      setProviderState(activeProvider);
+
+      const unresolved = parsed.filter((player) => player.sourceProvider === 'gemini' && !player.teamId && player.team && player.team !== 'Unknown club');
+      if (unresolved.length) {
+        const key = getApiKey(activeProvider);
+        if (key) {
+          Promise.all(unresolved.map(async (player) => {
+            try {
+              const response = await fetch(`/api/teams/resolve?name=${encodeURIComponent(player.team)}&provider=${activeProvider}`, { headers: { 'x-scoutboard-api-key': key } });
+              const data = await response.json();
+              return response.ok && data.team?.id ? { ...player, teamId: data.team.id, team: data.team.name || player.team, teamLogo: data.team.logo || player.teamLogo, provider: activeProvider } : null;
+            } catch { return null; }
+          })).then((resolved) => {
+            const updates = resolved.filter(Boolean) as Player[];
+            if (!updates.length) return;
+            setWatchlist((current) => {
+              const byId = new Map(updates.map((player) => [String(player.id), player]));
+              const next = current.map((player) => byId.get(String(player.id)) || player);
+              saveWatchlist(next);
+              return next;
+            });
+          });
+        }
+      }
     } catch {}
   }, []);
 
