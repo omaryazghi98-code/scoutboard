@@ -6,7 +6,8 @@ export async function GET(request: Request) {
   const teamId = Number(value);
   if (!Number.isInteger(teamId) || teamId <= 0) return NextResponse.json({ fixtures: [], error: 'Invalid teamId' }, { status: 400 });
   try {
-    const rows = await nextFixtures(teamId, 10);
+    const apiKey = request.headers.get('x-scoutboard-api-key') || undefined;
+    const rows = await nextFixtures(teamId, 10, apiKey);
     const fixtures = rows.map((row) => ({
       id: String(row.fixture.id),
       kickoff: row.fixture.date,
