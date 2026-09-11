@@ -25,6 +25,7 @@ type Fixture = {
 };
 
 const STORAGE_KEY = 'scoutboard-watchlist';
+const API_KEY_STORAGE = 'scoutboard-api-football-key';
 
 export default function Home() {
   const [watchlist, setWatchlist] = useState<Player[]>([]);
@@ -51,15 +52,18 @@ export default function Home() {
       return;
     }
 
-    let cancelled = false;
-    Promise.all(teamIds.map((teamId) => fetch(`/api/fixtures/team?teamId=${teamId}`).then((res) => res.ok ? res.json() : { fixtures: [] }).catch(() => ({ fixtures: [] }))))
+    const controller = new AbortController();
+    const headers: HeadersInit = {};
+    const apiKey = window.localStorage.getItem(API_KEY_STORAGE)?.trim();
+    if (apiKey) headers['x-scoutboard-api-key'] = apiKey;
+
+    Promise.all(teamIds.map((teamId) => fetch(`/api/fixtures/team?teamId=${teamId}`, { headers, signal: controller.signal }).then((res) => res.ok ? res.json() : { fixtures: [] }).catch(() => ({ fixtures: [] }))))
       .then((payloads) => {
-        if (cancelled) return;
         const merged = payloads.flatMap((payload) => payload.fixtures as Fixture[]).sort((a, b) => a.kickoff.localeCompare(b.kickoff));
         const unique = merged.filter((fixture, index, all) => all.findIndex((item) => item.id === fixture.id) === index);
         setFixtures(unique.slice(0, 12));
       });
-    return () => { cancelled = true; };
+    return () => controller.abort();
   }, [watchlist]);
 
   useEffect(() => {
@@ -76,7 +80,10 @@ export default function Home() {
       setSearching(true);
       setSearchError('');
       try {
-        const response = await fetch(`/api/players/search?q=${encodeURIComponent(term)}`, { signal: controller.signal });
+        const headers: HeadersInit = {};
+        const apiKey = window.localStorage.getItem(API_KEY_STORAGE)?.trim();
+        if (apiKey) headers['x-scoutboard-api-key'] = apiKey;
+        const response = await fetch(`/api/players/search?q=${encodeURIComponent(term)}`, { headers, signal: controller.signal });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Player search is unavailable.');
         setResults(data.players ?? []);
@@ -133,6 +140,7 @@ export default function Home() {
           <a className="navActive" href="/">Board</a>
           <a href="/watchlist">Watchlist <b>{watchedCount}</b></a>
           <a href="/calendar">Calendar</a>
+          <a href="/settings">Settings</a>
         </nav>
       </header>
 
@@ -142,93 +150,25 @@ export default function Home() {
           <h1>Your scouting schedule, <span className="accent">automated.</span></h1>
           <p>Track the players you care about. Scoutboard finds their clubs and upcoming fixtures, then turns your list into a focused scouting calendar.</p>
         </div>
-        <div className="heroStat">
-          <span className="eyebrow">WATCHING</span>
-          <strong>{watchedCount}</strong>
-          <small>{teamCount} club{teamCount === 1 ? '' : 's'} connected</small>
-        </div>
+        <div className="heroStat"><span className="eyebrow">WATCHING</span><strong>{watchedCount}</strong><small>{teamCount} club{teamCount === 1 ? '' : 's'} connected</small></div>
       </section>
 
       <section className="commandBar">
         <button className="primaryButton" onClick={() => { setShowSearch(true); setNotice(''); }}>+ Add player</button>
         <a className="ghostButton" href="/watchlist">Open watchlist</a>
         <a className="ghostButton" href="/calendar">View calendar</a>
+        <a className="ghostButton" href="/settings">Provider settings</a>
         {notice && <span className="notice">{notice}</span>}
       </section>
 
       <section className="sectionBlock">
-        <div className="sectionHeader">
-          <div><div className="eyebrow">YOUR BOARD</div><h2>Watchlist</h2></div>
-          <button className="smallButton" onClick={() => setShowSearch(true)}>+ Player</button>
-        </div>
-
-        {watchlist.length === 0 ? (
-          <article className="emptyCard">
-            <div className="emptyMark">◎</div>
-            <h3>Your board is empty.</h3>
-            <p>Search the live player database and add the people you want to scout. Their current club becomes the starting point for match radar.</p>
-            <button className="primaryButton" onClick={() => setShowSearch(true)}>Find players</button>
-          </article>
-        ) : (
-          <div className="playerGrid">
-            {watchlist.map((player, index) => (
-              <article className="playerCard" key={player.id}>
-                <div className="cardTop"><span className="rank">0{index + 1}</span><button className="iconButton" aria-label={`Remove ${player.name}`} onClick={() => removePlayer(player.id)}>×</button></div>
-                {player.photo ? <img className="avatar playerPhoto" src={player.photo} alt="" /> : <div className="avatar">{player.name.split(' ').map((part) => part[0]).slice(0, 2).join('')}</div>}
-                <div className="playerName">{player.name}</div>
-                <div className="playerMeta">{player.team} · {player.position}</div>
-                <div className="cardFooter"><span>{player.nationality}</span><span className="statusPill">WATCHING</span></div>
-              </article>
-            ))}
-          </div>
-        )}
+        <div className="sectionHeader"><div><div className="eyebrow">YOUR BOARD</div><h2>Watchlist</h2></div><button className="smallButton" onClick={() => setShowSearch(true)}>+ Player</button></div>
+        {watchlist.length === 0 ? <article className="emptyCard"><div className="emptyMark">◎</div><h3>Your board is empty.</h3><p>Search the live player database and add the people you want to scout. Their current club becomes the starting point for match radar.</p><button className="primaryButton" onClick={() => setShowSearch(true)}>Find players</button></article> : <div className="playerGrid">{watchlist.map((player, index) => <article className="playerCard" key={player.id}><div className="cardTop"><span className="rank">0{index + 1}</span><button className="iconButton" aria-label={`Remove ${player.name}`} onClick={() => removePlayer(player.id)}>×</button></div>{player.photo ? <img className="avatar playerPhoto" src={player.photo} alt="" /> : <div className="avatar">{player.name.split(' ').map((part) => part[0]).slice(0, 2).join('')}</div>}<div className="playerName">{player.name}</div><div className="playerMeta">{player.team} · {player.position}</div><div className="cardFooter"><span>{player.nationality}</span><span className="statusPill">WATCHING</span></div></article>)}</div>}
       </section>
 
-      <section className="splitGrid">
-        <article className="featureCard">
-          <div className="eyebrow">MATCH RADAR / API-FOOTBALL</div>
-          <h2>Upcoming matches</h2>
-          <p>Live fixtures pulled from the clubs connected to your watchlist.</p>
-          <div className="miniTimeline">
-            {fixtures.length ? fixtures.slice(0, 6).map((fixture) => {
-              const formatted = formatFixture(fixture.kickoff);
-              const playersHere = watchlist.filter((player) => player.teamId === fixture.home.id || player.teamId === fixture.away.id);
-              return <div key={fixture.id}><span>{formatted.day}<br />{formatted.date}</span><strong>{fixture.home.name} vs {fixture.away.name}<small>{playersHere.map((player) => player.name).join(', ')}</small></strong><em>{formatted.time}</em></div>;
-            }) : <div className="timelineEmpty">Add a player to start the radar.</div>}
-          </div>
-        </article>
-        <article className="featureCard">
-          <div className="eyebrow">IPHONE CALENDAR</div>
-          <h2>One calendar for your scouting days.</h2>
-          <p>Export the matches around your watchlist now. The next calendar backend step will give you a private subscription feed that stays updated.</p>
-          <div className="calendarPreview"><span>◎</span><div><strong>Scoutboard / My Players</strong><small>{fixtures.length} live fixtures in radar</small></div></div>
-          <a className="ghostButton" href="/calendar">Open calendar</a>
-        </article>
-      </section>
+      <section className="splitGrid"><article className="featureCard"><div className="eyebrow">MATCH RADAR / API-FOOTBALL</div><h2>Upcoming matches</h2><p>Live fixtures pulled from the clubs connected to your watchlist.</p><div className="miniTimeline">{fixtures.length ? fixtures.slice(0, 6).map((fixture) => { const formatted = formatFixture(fixture.kickoff); const playersHere = watchlist.filter((player) => player.teamId === fixture.home.id || player.teamId === fixture.away.id); return <div key={fixture.id}><span>{formatted.day}<br />{formatted.date}</span><strong>{fixture.home.name} vs {fixture.away.name}<small>{playersHere.map((player) => player.name).join(', ')}</small></strong><em>{formatted.time}</em></div>; }) : <div className="timelineEmpty">Add a player to start the radar.</div>}</div></article><article className="featureCard"><div className="eyebrow">IPHONE CALENDAR</div><h2>One calendar for your scouting days.</h2><p>Export the matches around your watchlist now. The next calendar backend step will give you a private subscription feed that stays updated.</p><div className="calendarPreview"><span>◎</span><div><strong>Scoutboard / My Players</strong><small>{fixtures.length} live fixtures in radar</small></div></div><a className="ghostButton" href="/calendar">Open calendar</a></article></section>
 
-      {showSearch && (
-        <div className="modalBackdrop" onMouseDown={() => setShowSearch(false)}>
-          <section className="searchModal" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="modalHeader"><div><div className="eyebrow">LIVE PLAYER DISCOVERY</div><h2>Add a player</h2></div><button className="iconButton" onClick={() => setShowSearch(false)}>×</button></div>
-            <input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search any real player..." />
-            <div className="searchResults">
-              {!query.trim() && <div className="noResults">Type at least 2 characters to search the live player database.</div>}
-              {searching && <div className="noResults">Searching live data…</div>}
-              {searchError && <div className="searchError">{searchError}<small>Check API_FOOTBALL_KEY in your local .env.local.</small></div>}
-              {!searching && !searchError && results.map((player) => {
-                const alreadyAdded = watchlist.some((item) => item.id === player.id);
-                return <button className="resultRow" key={`${player.id}-${player.teamId ?? 'team'}`} onClick={() => addPlayer(player)} disabled={alreadyAdded}>
-                  {player.photo ? <img className="resultAvatar playerPhoto" src={player.photo} alt="" /> : <span className="resultAvatar">{player.name.split(' ').map((part) => part[0]).slice(0, 2).join('')}</span>}
-                  <span className="resultIdentity"><strong>{player.name}</strong><small>{player.team} · {player.position} · {player.nationality}</small></span>
-                  <span className="resultAction">{alreadyAdded ? 'ADDED' : '+ ADD'}</span>
-                </button>;
-              })}
-              {!searching && !searchError && query.trim().length >= 2 && results.length === 0 && <div className="noResults">No player results.</div>}
-            </div>
-            <div className="modalFoot"><span>Live provider data</span><span className="mono">API-Football → Scoutboard</span></div>
-          </section>
-        </div>
-      )}
+      {showSearch && <div className="modalBackdrop" onMouseDown={() => setShowSearch(false)}><section className="searchModal" onMouseDown={(event) => event.stopPropagation()}><div className="modalHeader"><div><div className="eyebrow">LIVE PLAYER DISCOVERY</div><h2>Add a player</h2></div><button className="iconButton" onClick={() => setShowSearch(false)}>×</button></div><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search any real player..." /><div className="searchResults">{!query.trim() && <div className="noResults">Type at least 2 characters to search the live player database.</div>}{searching && <div className="noResults">Searching live data…</div>}{searchError && <div className="searchError">{searchError}<small>Set your API key in Settings or configure API_FOOTBALL_KEY.</small></div>}{!searching && !searchError && results.map((player) => { const alreadyAdded = watchlist.some((item) => item.id === player.id); return <button className="resultRow" key={`${player.id}-${player.teamId ?? 'team'}`} onClick={() => addPlayer(player)} disabled={alreadyAdded}>{player.photo ? <img className="resultAvatar playerPhoto" src={player.photo} alt="" /> : <span className="resultAvatar">{player.name.split(' ').map((part) => part[0]).slice(0, 2).join('')}</span>}<span className="resultIdentity"><strong>{player.name}</strong><small>{player.team} · {player.position} · {player.nationality}</small></span><span className="resultAction">{alreadyAdded ? 'ADDED' : '+ ADD'}</span></button>; })}{!searching && !searchError && query.trim().length >= 2 && results.length === 0 && <div className="noResults">No player results.</div>}</div><div className="modalFoot"><span>Live provider data</span><span className="mono">API-Football → Scoutboard</span></div></section></div>}
     </main>
   );
 }
