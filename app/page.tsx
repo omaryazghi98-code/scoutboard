@@ -52,6 +52,8 @@ export default function Home() {
   const [searchError, setSearchError] = useState('');
   const [notice, setNotice] = useState('');
   const [fixtures, setFixtures] = useState<Fixture[]>([]);
+  const [fixtureLoading, setFixtureLoading] = useState(false);
+  const [fixtureError, setFixtureError] = useState('');
   const [leagueId, setLeagueId] = useState(39);
 
   useEffect(() => {
@@ -68,16 +70,35 @@ export default function Home() {
     const teamIds = [...new Set(watchlist.map((player) => player.teamId).filter((id): id is number => Boolean(id)))];
     if (!teamIds.length) {
       setFixtures([]);
+      setFixtureLoading(false);
+      setFixtureError('');
       return;
     }
 
     let cancelled = false;
-    Promise.all(teamIds.map((teamId) => fetch(`/api/fixtures/team?teamId=${teamId}`).then((res) => res.ok ? res.json() : { fixtures: [] }).catch(() => ({ fixtures: [] }))))
+    const apiKey = getApiKey();
+    setFixtureLoading(true);
+    setFixtureError('');
+    Promise.all(teamIds.map((teamId) => fetch(`/api/fixtures/team?teamId=${teamId}`, {
+      headers: apiKey ? { 'x-scoutboard-api-key': apiKey } : undefined,
+    }).then(async (res) => {
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Fixture request failed (${res.status})`);
+      return data;
+    })))
       .then((payloads) => {
         if (cancelled) return;
         const merged = payloads.flatMap((payload) => payload.fixtures as Fixture[]).sort((a, b) => a.kickoff.localeCompare(b.kickoff));
         const unique = merged.filter((fixture, index, all) => all.findIndex((item) => item.id === fixture.id) === index);
         setFixtures(unique.slice(0, 12));
+      })
+      .catch((error) => {
+        if (cancelled) return;
+        setFixtures([]);
+        setFixtureError(error instanceof Error ? error.message : 'Unable to load fixtures.');
+      })
+      .finally(() => {
+        if (!cancelled) setFixtureLoading(false);
       });
     return () => { cancelled = true; };
   }, [watchlist]);
@@ -96,9 +117,10 @@ export default function Home() {
       setSearching(true);
       setSearchError('');
       try {
+        const apiKey = getApiKey();
         const response = await fetch(`/api/players/search?q=${encodeURIComponent(term)}&league=${leagueId}&season=${SEASON}`, {
           signal: controller.signal,
-          headers: getApiKey() ? { 'x-scoutboard-api-key': getApiKey() } : undefined,
+          headers: apiKey ? { 'x-scoutboard-api-key': apiKey } : undefined,
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Player search is unavailable.');
@@ -221,11 +243,14 @@ export default function Home() {
           <h2>Upcoming matches</h2>
           <p>Live fixtures pulled from the clubs connected to your watchlist.</p>
           <div className="miniTimeline">
-            {fixtures.length ? fixtures.slice(0, 6).map((fixture) => {
+            {fixtureLoading && <div className="timelineEmpty">Loading fixtures…</div>}
+            {!fixtureLoading && fixtureError && <div className="timelineEmpty">{fixtureError}</div>}
+            {!fixtureLoading && !fixtureError && fixtures.length ? fixtures.slice(0, 6).map((fixture) => {
               const formatted = formatFixture(fixture.kickoff);
               const playersHere = watchlist.filter((player) => player.teamId === fixture.home.id || player.teamId === fixture.away.id);
               return <div key={fixture.id}><span>{formatted.day}<br />{formatted.date}</span><strong>{fixture.home.name} vs {fixture.away.name}<small>{playersHere.map((player) => player.name).join(', ')}</small></strong><em>{formatted.time}</em></div>;
-            }) : <div className="timelineEmpty">Add a player to start the radar.</div>}
+            }) : null}
+            {!fixtureLoading && !fixtureError && !fixtures.length && <div className="timelineEmpty">Add a player to start the radar.</div>}
           </div>
         </article>
         <article className="featureCard">
