@@ -1,4 +1,4 @@
-import { nextFixturesFootballdata, searchPlayersFootballdata } from './footballdata-provider';
+import { getPlayerFootballdata, nextFixturesFootballdata, searchPlayersFootballdata } from './footballdata-provider';
 import { nextFixturesOpenFoot, searchPlayersOpenFoot } from './openfoot-provider';
 
 const BASE_URL = process.env.FOOTBALL_API_BASE_URL || 'https://v3.football.api-sports.io';
@@ -25,8 +25,17 @@ export async function searchPlayers(query: string, leagueId: number, season: num
   return apiFootballRequest<PlayerResponse>(`/players?${params.toString()}`, apiKey);
 }
 
+export async function getPlayerProfile(playerId: number | string, provider: ProviderName, apiKey?: string) {
+  if (provider === 'footballdata') return getPlayerFootballdata(playerId, apiKey || '');
+  if (provider === 'api-football') {
+    const rows = await apiFootballRequest<PlayerResponse>(`/players?id=${encodeURIComponent(String(playerId))}`, apiKey);
+    return rows[0] || null;
+  }
+  return null;
+}
+
 export async function nextFixtures(teamId: number | string, count = 10, apiKey?: string, provider: ProviderName = 'api-football') {
-  if (provider === 'footballdata') return nextFixturesFootballdata(Number(teamId), apiKey || '');
+  if (provider === 'footballdata') return nextFixturesFootballdata(teamId, apiKey || '');
   if (provider === 'openfoot') return nextFixturesOpenFoot(String(teamId), apiKey || '');
-  return apiFootballRequest<FixtureResponse>(`/fixtures?team=${teamId}&next=${count}`, apiKey);
+  return apiFootballRequest<FixtureResponse>(`/fixtures?team=${encodeURIComponent(String(teamId))}&next=${count}`, apiKey);
 }
