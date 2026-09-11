@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { ProviderName, getPlayerProfile, searchPlayers } from '../../../../lib/football-provider';
 import { resolvePlayers } from '../../../../lib/player-resolver';
-import { searchPlayersGemini } from '../../../../lib/gemini-provider';
 
 function normalize(row: any, provider: ProviderName | 'gemini') {
   const p = row?.player || row || {};
