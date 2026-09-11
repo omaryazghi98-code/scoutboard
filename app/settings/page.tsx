@@ -2,27 +2,39 @@
 
 import { useEffect, useState } from 'react';
 
-const KEY_STORAGE = 'scoutboard-api-football-key';
+const PROVIDER_KEY = 'scoutboard-provider';
+const PROVIDER_KEYS = {
+  footballdata: 'scoutboard-footballdata-key',
+  openfoot: 'scoutboard-openfoot-key',
+  'api-football': 'scoutboard-api-football-key',
+} as const;
+
+type Provider = keyof typeof PROVIDER_KEYS;
 
 export default function SettingsPage() {
-  const [apiKey, setApiKey] = useState('');
+  const [provider, setProvider] = useState<Provider>('footballdata');
+  const [keys, setKeys] = useState<Record<Provider, string>>({ footballdata: '', openfoot: '', 'api-football': '' });
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    setApiKey(window.localStorage.getItem(KEY_STORAGE) || '');
+    try {
+      const storedProvider = window.localStorage.getItem(PROVIDER_KEY) as Provider | null;
+      if (storedProvider && PROVIDER_KEYS[storedProvider]) setProvider(storedProvider);
+      setKeys({
+        footballdata: window.localStorage.getItem(PROVIDER_KEYS.footballdata) || '',
+        openfoot: window.localStorage.getItem(PROVIDER_KEYS.openfoot) || '',
+        'api-football': window.localStorage.getItem(PROVIDER_KEYS['api-football']) || '',
+      });
+    } catch {}
   }, []);
 
   const save = () => {
-    if (apiKey.trim()) window.localStorage.setItem(KEY_STORAGE, apiKey.trim());
-    else window.localStorage.removeItem(KEY_STORAGE);
-    setApiKey(apiKey.trim());
-    setSaved(true);
-    window.setTimeout(() => setSaved(false), 1800);
-  };
-
-  const clear = () => {
-    window.localStorage.removeItem(KEY_STORAGE);
-    setApiKey('');
+    window.localStorage.setItem(PROVIDER_KEY, provider);
+    (Object.keys(PROVIDER_KEYS) as Provider[]).forEach((name) => {
+      const value = keys[name].trim();
+      if (value) window.localStorage.setItem(PROVIDER_KEYS[name], value);
+      else window.localStorage.removeItem(PROVIDER_KEYS[name]);
+    });
     setSaved(true);
     window.setTimeout(() => setSaved(false), 1800);
   };
@@ -34,31 +46,26 @@ export default function SettingsPage() {
     </header>
 
     <section className="settingsHero">
-      <div>
-        <div className="eyebrow">SYSTEM / PROVIDERS</div>
-        <h1>Connect your football data.</h1>
-        <p>Scoutboard can use your own API-Football key. The key is stored only in this browser and sent to your local Scoutboard server when you search.</p>
-      </div>
-      <div className="providerBadge"><span>API-FOOTBALL</span><strong>READY</strong></div>
+      <div><div className="eyebrow">SYSTEM / PROVIDERS</div><h1>Choose your football data.</h1><p>Scoutboard keeps the provider layer modular. Pick the source you want to use for discovery and fixtures, then swap it without changing the app.</p></div>
+      <div className="providerBadge"><span>PRIMARY</span><strong>{provider === 'footballdata' ? 'FOOTBALLDATA.IO' : provider === 'openfoot' ? 'OPENFOOTAPI' : 'API-FOOTBALL'}</strong></div>
     </section>
 
     <section className="settingsGrid">
       <article className="featureCard settingsCard">
-        <div className="eyebrow">PRIMARY PROVIDER</div>
-        <h2>API-Football</h2>
-        <p>Paste the key from your API-Football dashboard. Leave it empty to fall back to the server-side <span className="mono">API_FOOTBALL_KEY</span> environment variable.</p>
-        <label className="fieldLabel">API key<input type="password" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder="Paste API-Football key" autoComplete="off" /></label>
-        <div className="settingsActions"><button className="primaryButton" onClick={save}>{saved ? '✓ Saved' : 'Save key'}</button><button className="ghostButton" onClick={clear}>Clear local key</button></div>
-        <div className="settingsNote"><span>◎</span><div><strong>Local-first configuration</strong><small>Your browser keeps this setting in localStorage. It is not committed to GitHub.</small></div></div>
+        <div className="eyebrow">ACTIVE PROVIDER</div>
+        <h2>Data source</h2>
+        <label className="fieldLabel">Primary provider<select value={provider} onChange={(event) => setProvider(event.target.value as Provider)}><option value="footballdata">Footballdata.io</option><option value="openfoot">OpenFootAPI</option><option value="api-football">API-Football</option></select></label>
+        {(Object.keys(PROVIDER_KEYS) as Provider[]).map((name) => <label className="fieldLabel" key={name}>{name === 'footballdata' ? 'Footballdata.io API key' : name === 'openfoot' ? 'OpenFootAPI key' : 'API-Football key'}<input type="password" value={keys[name]} onChange={(event) => setKeys((current) => ({ ...current, [name]: event.target.value }))} placeholder={`Paste ${name === 'api-football' ? 'API-Football' : name === 'openfoot' ? 'OpenFootAPI' : 'Footballdata.io'} key`} autoComplete="off" /></label>)}
+        <div className="settingsActions"><button className="primaryButton" onClick={save}>{saved ? '✓ Saved' : 'Save provider settings'}</button></div>
+        <div className="settingsNote"><span>◎</span><div><strong>Local configuration</strong><small>Provider choice and keys stay in this browser and are never committed to GitHub.</small></div></div>
       </article>
 
       <article className="featureCard settingsCard">
-        <div className="eyebrow">NEXT PROVIDERS</div>
-        <h2>Provider slots</h2>
-        <p>The data layer is intentionally modular so we can add Sportmonks later for richer broadcast coverage without redesigning the app.</p>
-        <div className="providerRow"><span>API-Football</span><strong>LIVE</strong></div>
-        <div className="providerRow mutedRow"><span>Sportmonks</span><strong>PLANNED</strong></div>
-        <div className="providerRow mutedRow"><span>SofaScore</span><strong>REFERENCE ONLY</strong></div>
+        <div className="eyebrow">WHY THESE THREE</div>
+        <h2>Provider roles</h2>
+        <div className="providerRow"><span>Footballdata.io</span><strong>PRIMARY</strong></div><p>Excellent fit for our core flow: player search, team identity, and upcoming fixtures through the same API. citeturn375197search0turn375197search2</p>
+        <div className="providerRow"><span>OpenFootAPI</span><strong>SECONDARY</strong></div><p>Useful alternate source with team squads, team-filtered matches, lineups and xG-oriented match data. citeturn375197search4</p>
+        <div className="providerRow"><span>API-Football</span><strong>LEGACY</strong></div><p>Still supported for comparison and fallback while we stabilize the multi-provider layer.</p>
       </article>
     </section>
   </main>;
