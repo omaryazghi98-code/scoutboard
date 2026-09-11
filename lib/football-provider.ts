@@ -30,8 +30,8 @@ type FixtureResponse = {
 
 type ProviderResponse<T> = { response?: T[]; errors?: Record<string, unknown> };
 
-async function request<T>(path: string): Promise<T[]> {
-  const key = process.env.API_FOOTBALL_KEY;
+async function request<T>(path: string, apiKey?: string): Promise<T[]> {
+  const key = apiKey?.trim() || process.env.API_FOOTBALL_KEY;
   if (!key) throw new Error('API_FOOTBALL_KEY is not configured');
 
   const response = await fetch(`${BASE_URL}${path}`, {
@@ -41,14 +41,17 @@ async function request<T>(path: string): Promise<T[]> {
 
   if (!response.ok) throw new Error(`Football provider request failed (${response.status})`);
   const data = (await response.json()) as ProviderResponse<T>;
-  if (data.errors && Object.keys(data.errors).length > 0) throw new Error('Football provider returned an error');
+  if (data.errors && Object.keys(data.errors).length > 0) {
+    const detail = Object.values(data.errors).map(String).join('; ');
+    throw new Error(detail || 'Football provider returned an error');
+  }
   return data.response ?? [];
 }
 
-export async function searchPlayers(query: string) {
-  return request<PlayerResponse>(`/players?search=${encodeURIComponent(query.trim())}`);
+export async function searchPlayers(query: string, apiKey?: string) {
+  return request<PlayerResponse>(`/players?search=${encodeURIComponent(query.trim())}`, apiKey);
 }
 
-export async function nextFixtures(teamId: number, count = 10) {
-  return request<FixtureResponse>(`/fixtures?team=${teamId}&next=${count}`);
+export async function nextFixtures(teamId: number, count = 10, apiKey?: string) {
+  return request<FixtureResponse>(`/fixtures?team=${teamId}&next=${count}`, apiKey);
 }
