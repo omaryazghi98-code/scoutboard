@@ -39,8 +39,9 @@ export async function GET(request: Request) {
   if (providerParam === 'gemini') {
     try {
       const apiKey = request.headers.get('x-scoutboard-gemini-key') || '';
-      const model = params.get('model') || 'gemini-3.8-flash';
-      const players = await searchPlayersGemini(query, apiKey, model);
+      const model = params.get('model') || 'gemini-3.7-flash';
+      const grounding = params.get('grounding') === 'true';
+      const players = await searchPlayersGemini(query, apiKey, model, grounding);
       return NextResponse.json({ players, provider: 'gemini' });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Gemini player search failed.';
