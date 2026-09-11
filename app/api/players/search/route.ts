@@ -5,7 +5,8 @@ export async function GET(request: Request) {
   const query = new URL(request.url).searchParams.get('q')?.trim() || '';
   if (query.length < 2) return NextResponse.json({ players: [] });
   try {
-    const rows = await searchPlayers(query);
+    const apiKey = request.headers.get('x-scoutboard-api-key') || undefined;
+    const rows = await searchPlayers(query, apiKey);
     const players = rows.slice(0, 12).map((row) => ({
       id: String(row.player.id),
       providerId: row.player.id,
