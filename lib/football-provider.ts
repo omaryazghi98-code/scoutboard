@@ -48,8 +48,13 @@ async function request<T>(path: string, apiKey?: string): Promise<T[]> {
   return data.response ?? [];
 }
 
-export async function searchPlayers(query: string, apiKey?: string) {
-  return request<PlayerResponse>(`/players?search=${encodeURIComponent(query.trim())}`, apiKey);
+export async function searchPlayers(query: string, leagueId: number, season: number, apiKey?: string) {
+  const params = new URLSearchParams({
+    search: query.trim(),
+    league: String(leagueId),
+    season: String(season),
+  });
+  return request<PlayerResponse>(`/players?${params.toString()}`, apiKey);
 }
 
 export async function nextFixtures(teamId: number, count = 10, apiKey?: string) {
