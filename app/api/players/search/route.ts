@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { ProviderName, getPlayerProfile, searchPlayers } from '../../../../lib/football-provider';
-import { searchPlayersGemini } from '../../../../lib/gemini-provider';
 import { resolvePlayers } from '../../../../lib/player-resolver';
+import { searchPlayersGemini } from '../../../../lib/gemini-provider';
 
 function normalize(row: any, provider: ProviderName | 'gemini') {
   const p = row?.player || row || {};
@@ -39,23 +39,18 @@ export async function GET(request: Request) {
 
   if (providerParam === 'gemini') {
     try {
-      const footballApiKey = request.headers.get('x-scoutboard-api-key') || undefined;
+      const footballApiKey = request.headers.get('x-scoutboard-api-key') || '';
       const geminiApiKey = request.headers.get('x-scoutboard-gemini-key') || '';
       const geminiModel = params.get('model') || 'gemini-3.8-flash';
 
-      // The resolver owns identity. It prefers football sources, uses TheSportsDB as
-      // a second independent source, and calls Gemini only when those sources fail.
-      const resolved = await resolvePlayers(query, { footballApiKey, geminiApiKey, geminiModel });
-      if (resolved.length) return NextResponse.json({ players: resolved, provider: 'gemini', mode: 'resolved' });
-
-      // Keep a narrow AI fallback for projects that do not have a football provider key.
       if (!footballApiKey) {
-        const players = await searchPlayersGemini(query, geminiApiKey, geminiModel, false);
-        return NextResponse.json({ players, provider: 'gemini', mode: 'ai-only' });
+        return NextResponse.json({ players: [], provider: 'gemini', error: 'A football data provider key is required for verified player search and fixture mapping. Open Settings and configure Footballdata.io.' }, { status: 503 });
       }
-      return NextResponse.json({ players: [], provider: 'gemini', mode: 'resolved', error: 'No verified player match found.' });
+
+      const resolved = await resolvePlayers(query, { footballApiKey, geminiApiKey, geminiModel });
+      return NextResponse.json({ players: resolved, provider: 'gemini', mode: 'resolved' });
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Player discovery failed.';
+      const message = error instanceof Error ? error.message : 'Verified player discovery failed.';
       return NextResponse.json({ players: [], error: message }, { status: message.toLowerCase().includes('not configured') ? 503 : 502 });
     }
   }
