@@ -1,0 +1,4 @@
+export type ProviderPlayer = { id:string; name:string; imageUrl?:string|null; nationality?:string|null; position?:string|null; team?:{id:string;name:string;logoUrl?:string|null}|null };
+export type ProviderFixture = { id:string; startTime:string; status:string; competition?:string|null; venue?:string|null; homeTeam:{id:string;name:string;logoUrl?:string|null}; awayTeam:{id:string;name:string;logoUrl?:string|null}; broadcasts?:ProviderBroadcast[] };
+export type ProviderBroadcast = { country:string; countryCode?:string|null; station:string; url?:string|null; logoUrl?:string|null };
+export interface FootballProvider { searchPlayers(query:string):Promise<ProviderPlayer[]>; upcomingFixturesForTeam(teamId:string,from:string,to:string):Promise<ProviderFixture[]>; fixtureBroadcasts(fixtureId:string):Promise<ProviderBroadcast[]>; }
