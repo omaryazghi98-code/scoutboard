@@ -49,14 +49,14 @@ export default function SettingsPage() {
 
   return <main className="workspace">
     <header className="topbar"><a className="brand" href="/">SCOUTBOARD <span>0.1</span></a><nav><a href="/">Board</a><a href="/watchlist">Watchlist</a><a href="/calendar">Calendar</a><a className="navActive" href="/settings">Settings</a></nav></header>
-    <section className="settingsHero"><div><div className="eyebrow">SYSTEM / PROVIDERS</div><h1>Configure your data stack.</h1><p>Gemini discovers players. A separate football provider resolves club IDs and powers fixtures. Each layer can be swapped independently.</p></div><div className="providerBadge"><span>FIXTURE PROVIDER</span><strong>{labels[fixtureProvider].toUpperCase()}</strong></div></section>
+    <section className="settingsHero"><div><div className="eyebrow">SYSTEM / PROVIDERS</div><h1>Configure your data stack.</h1><p>AI helps with discovery, but it never becomes the source of truth. Football data owns the canonical club identity used for fixtures.</p></div><div className="providerBadge"><span>FIXTURE PROVIDER</span><strong>{labels[fixtureProvider].toUpperCase()}</strong></div></section>
     <section className="settingsGrid">
       <article className="featureCard settingsCard">
         <div className="eyebrow">AI / PLAYER DISCOVERY</div><h2>Gemini</h2>
-        <p>Search players with Gemini. The model is independent from your football fixture provider.</p>
+        <p>Used only as a fallback/disambiguator after direct football sources are checked. This keeps AI calls cheaper and prevents guessed clubs from driving your calendar.</p>
         <label className="fieldLabel">Gemini API key<input type="password" value={geminiKey} onChange={(event) => setGeminiKey(event.target.value)} placeholder="Paste Gemini API key" autoComplete="off" /></label>
         <label className="fieldLabel">Model<select value={geminiModel} onChange={(event) => setGeminiModel(event.target.value)}>{models.map((model) => <option value={model} key={model}>{model}</option>)}</select></label>
-        <label className="toggleRow"><input type="checkbox" checked={geminiGrounding} onChange={(event) => setGeminiGrounding(event.target.checked)} /><span><strong>Google Search grounding</strong><small>Optional. Leave off when your Gemini API project does not include Search grounding.</small></span></label>
+        <label className="toggleRow"><input type="checkbox" checked={geminiGrounding} onChange={(event) => setGeminiGrounding(event.target.checked)} /><span><strong>Google Search grounding</strong><small>Optional and off by default. It is not required for the verified resolver path.</small></span></label>
       </article>
       <article className="featureCard settingsCard">
         <div className="eyebrow">FIXTURE / CLUB IDENTITY</div><h2>Football provider</h2>
@@ -65,6 +65,6 @@ export default function SettingsPage() {
         <div className="settingsNote"><span>◎</span><div><strong>Browser-local</strong><small>Keys, model choice and provider selection stay in this browser. No secret is committed to GitHub.</small></div></div>
       </article>
     </section>
-    <section className="sectionBlock"><div className="sectionHeader"><div><div className="eyebrow">FOOTBALL DATA KEYS</div><h2>Available match providers</h2></div></div><div className="featureCard settingsCard">{(Object.keys(labels) as FixtureProvider[]).map((name) => <label className="fieldLabel" key={name}>{labels[name]} API key<input type="password" value={keys[name]} onChange={(event) => setKeys((current) => ({ ...current, [name]: event.target.value }))} placeholder={`Paste ${labels[name]} key`} autoComplete="off" /></label>)}<p className="settingsHint"><strong>Pipeline:</strong> Gemini player discovery → current club name → football provider team ID → upcoming fixtures → calendar.</p></div></section>
+    <section className="sectionBlock"><div className="sectionHeader"><div><div className="eyebrow">FOOTBALL DATA KEYS</div><h2>Available match providers</h2></div></div><div className="featureCard settingsCard">{(Object.keys(labels) as FixtureProvider[]).map((name) => <label className="fieldLabel" key={name}>{labels[name]} API key<input type="password" value={keys[name]} onChange={(event) => setKeys((current) => ({ ...current, [name]: event.target.value }))} placeholder={`Paste ${labels[name]} key`} autoComplete="off" /></label>)}<p className="settingsHint"><strong>Verified pipeline:</strong> football data + TheSportsDB → reconcile player identity → canonical current club → resolve that club against the fixture provider → fixtures → calendar. Gemini only helps when direct sources cannot identify the player.</p></div></section>
   </main>;
 }
